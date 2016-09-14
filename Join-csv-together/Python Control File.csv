@@ -1,0 +1,6 @@
+Control Function
+Header,Name, Age, date
+Directory Location,//honts8080/mydrive/mydir
+save location,//honts8080/mydrive/mydir/Combined Output.csv
+replace,.,0
+

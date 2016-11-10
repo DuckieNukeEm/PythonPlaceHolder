@@ -29,6 +29,8 @@ def pull_historical_data(ticker_symbol, output_path, directory="Quote"):
         outfile.write(e.content)
         outfile.close()
         return('Not all data returned')
+    except:
+        return('Not Downloaded')
 
 def get_all_stock_symbols(directory = "List", output_path = "C:/Scripts/Python" ):
     path_exists(output_path + "/" + directory)

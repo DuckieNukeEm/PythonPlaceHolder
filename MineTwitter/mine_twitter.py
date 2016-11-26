@@ -3,7 +3,10 @@ import sys
 import os
 import twitter as ty
 import json
-import pymongo
+#import twitt_db as td
+from sets import Set
+import unicodecsv as csv
+
 
 #Now  defining functions  that I need to get this bad bow running
 
@@ -49,23 +52,88 @@ def  authenticate_this_bird(path, open_type ='rb', delimiter =":"):
 			auth_ring['consumersecret'])
 	return(auth)
 
-def twitter_search(twitter_api, q, max_results=220, **kw):
+def twitter_search(twitter_api, q, max_results=200, **kw):
 	"""Itterare through batch of results by following the cursor until we 
 		reach the desired number of results, keepign in mind that OAuth uses
 	can only make 180 serach querires per 15-minu interval"""
+
 	search_results = twitter_api.search.tweets(q=q, count = 100, **kw)
 	statuses = search_results['statuses']
 
+	#iterate through batch of results by following the cursor until we 
+	#reach the desired number of results, roughly 1k is reasonable
+
+	max_results = min(1000,max_results)
+
+	for _ in range(10):
+		try:
+			next_results = search_results['search_metadata']['next_results']
+		except KeyError, e: #if nor emore reuslt when next resuldes DNE
+			break
+
+		#creating a dictionary from next_results
+		kwargs = dict([kv.split('=')
+				for kv in next_results[1:].split("&") ])
+
+		search_reults = twitter_api.search.tweets(**kwargs)
+		statuses += search_results['statuses']
+
+		if len(statuses) > max_results:
+			break
+
+	return statuses
+
+def flatten_json(j, current_key = '', outerdict = None):
+	if outerdict is None:
+		outerdict = {}
+	for key, value in j.iteritems():
+		newkey = current_key + "." + key if current_key else key
+		if type(value) is not dict:
+			outerdict[newkey] = value
+		else:
+			flatten_json(value, current_key = newkey, outerdict = outerdict)
+	return outerdict
+
+def listify(j):
+	out_list = []
+	s = Set([])
+	#flatten each of the json files
+	for l in range(len(j)):
+		out_list.append(flatten_json(j[l]))
+		for key in out_list[l].keys():
+			if key not in s:
+				s.add(key)
+	set_list = list(s)
+	#squaring it so that all flattened files have common output
+	for l in range(len(out_list)):
+		d = out_list[l]
+		temp = []
+		for s_ in set_list:
+			temp.append(d.get(s_,None))
+		out_list[l] =  temp
+	return out_list,set_list
 
 def main():
 	"""The main function of python"""
 	auth = authenticate_this_bird(fig_auth_path())
 	tapi = ty.Twitter(auth = auth)
+
 	print(tapi)
-	t = tapi.search.tweets(q="#WM",count = 3)
-	print json.dumps(t['statuses'][0], indent = 1)
+	hashtage_list = ['#WM','WM','#WalMart','WalMart','#Wal-Mart','Wal-Mart','#WallyWorld']
+	t =  []
+	for hash in hashtage_list:
+		start_t = len(t)
+		t += twitter_search(tapi, q = hash, max_results = 1)
+		print("after adding hash %s, we are now  %i big" % (hash,start_t- len(t)))
 
-
+	flatten_t, header  = listify(t)
+	for flat in flatten_t[1]:
+		print(type(flat))
+	csvfile = os.path.expanduser("~") + '/twitterout.csv'
+	with open(csvfile, "w") as f:
+		writer = csv.writer(f,delimiter ="|", lineterminator = '\n', encoding = 'utf-8')
+		writer.writerow(header)
+		writer.writerows(flatten_t)
 
 if __name__=="__main__":
 	main()

@@ -1,6 +1,6 @@
 ########
 #
-#This packages contains all the functions needed to  operate with mongodb and twitter api
+#This packages contains all the functions needed to  operate with mongo/sql db and twitter api
 #
 #######
 
@@ -8,7 +8,7 @@
 import json
 import pymongo
 
-def save_to_mongo(data, mongo_db, mongo_db_Coll, **mongo_conn_kw):
+def save_to_mongo(data, mongo_db, mongo_db_coll, **mongo_conn_kw):
 	#connects to the mongoDB server running on
 	#localhost:270127 by default
 
@@ -34,7 +34,7 @@ def load_from_mongo(mongo_db, mongo_db_coll, return_cursor = False, criteria = N
 	# Consider leveraging MongoDB's aggregations framework for more
 	# sophisticated queries.
 	client = pymongo.MongoClient(**mongo_conn_kw)
-	db = client(mongo_db]
+	db = client[mongo_db]
 	coll = db[mongo_db_coll]
 
 	if criteria is None:
@@ -51,3 +51,8 @@ def load_from_mongo(mongo_db, mongo_db_coll, return_cursor = False, criteria = N
 		return cursor
 	else:
 		return[item for item in cursor]
+
+def create_sql_table(data, sql_data_name, **sql_kw):
+	t=1+1
+def save_to_sql(data, sql_db, **sql_kw):
+	t = 1+1	

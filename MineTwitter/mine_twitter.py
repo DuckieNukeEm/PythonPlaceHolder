@@ -89,10 +89,14 @@ def flatten_json(j, current_key = '', outerdict = None):
 	for key, value in j.iteritems():
 		newkey = current_key + "." + key if current_key else key
 		if type(value) is not dict:
-			outerdict[newkey] = value
+			if isinstance(value, basestring):
+				outerdict[newkey] =  value.replace('\n',' ') #getting ride of returns
+			else:
+				outerdict[newkey] = value
 		else:
 			flatten_json(value, current_key = newkey, outerdict = outerdict)
 	return outerdict
+
 
 def listify(j):
 	out_list = []
@@ -113,28 +117,32 @@ def listify(j):
 		out_list[l] =  temp
 	return out_list,set_list
 
+
 def main():
 	"""The main function of python"""
 	auth = authenticate_this_bird(fig_auth_path())
 	tapi = ty.Twitter(auth = auth)
 
 	print(tapi)
-	hashtage_list = ['#WM','WM','#WalMart','WalMart','#Wal-Mart','Wal-Mart','#WallyWorld']
+	hashtage_list = ['Walmart','#WalMart','\"Wal-Mart\"','#WallyWorld']
 	t =  []
 	for hash in hashtage_list:
 		start_t = len(t)
-		t += twitter_search(tapi, q = hash, max_results = 1)
-		print("after adding hash %s, we are now  %i big" % (hash,start_t- len(t)))
+		t += twitter_search(tapi, q = ' AND '.join([hash,
+							   '-filter:retweets',
+							  '-filter:replies',
+							 '\"out of stock\"']),\
+				 max_results = 1000, since = '2016-11-15',lang = 'en')
+		print("after adding hash %s, we are now  %i big" % (hash,len(t) - start_t))
 
 	flatten_t, header  = listify(t)
-	for flat in flatten_t[1]:
-		print(type(flat))
 	csvfile = os.path.expanduser("~") + '/twitterout.csv'
 	with open(csvfile, "w") as f:
 		writer = csv.writer(f,delimiter ="|", lineterminator = '\n', encoding = 'utf-8')
 		writer.writerow(header)
-		writer.writerows(flatten_t)
-
+		for item in flatten_t:
+		#writer.writerows(flatten_t)
+			writer.writerow(item)
 if __name__=="__main__":
 	main()
 

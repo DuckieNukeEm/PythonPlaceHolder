@@ -84,6 +84,9 @@ def twitter_search(twitter_api, q, max_results=200, **kw):
 	return statuses
 
 def flatten_json(j, current_key = '', outerdict = None):
+	"""becuase jason can be in this horible layout where we have dicts in dicts in dicts
+	in dicts, but it's not his mother, and my roomate ate my frog and aye aye aye
+	this flattens out a json file so that each column is the deepest root of every node"""
 	if outerdict is None:
 		outerdict = {}
 	for key, value in j.iteritems():
@@ -99,6 +102,8 @@ def flatten_json(j, current_key = '', outerdict = None):
 
 
 def listify(j):
+	"""standardize all the jason files in  j, so they they flatten out into 
+	a tableular format, for easy view in and research"""
 	out_list = []
 	s = Set([])
 	#flatten each of the json files
@@ -124,16 +129,20 @@ def main():
 	tapi = ty.Twitter(auth = auth)
 
 	print(tapi)
-	hashtage_list = ['Walmart','#WalMart','\"Wal-Mart\"','#WallyWorld']
+	hashtag_list = ['Walmart','#WalMart','\"Wal-Mart\"',"@walmart"]
+#	hashtag_buys = ['\"out of stock\"','\"Did not have\"','\"have it\"']
+	hashtag_buys =[' ']
 	t =  []
-	for hash in hashtage_list:
-		start_t = len(t)
-		t += twitter_search(tapi, q = ' AND '.join([hash,
+	for hash in hashtag_list:
+		for bash in hashtag_buys:
+			start_t = len(t)
+			t += twitter_search(tapi, q = ' AND '.join([hash,
+								bash,
 							   '-filter:retweets',
-							  '-filter:replies',
-							 '\"out of stock\"']),\
-				 max_results = 1000, since = '2016-11-15',lang = 'en')
-		print("after adding hash %s, we are now  %i big" % (hash,len(t) - start_t))
+							  '-filter:replies'
+							 ]),\
+				 max_results = 1000, since = '2016-11-01',lang = 'en')
+			print("after adding hash %s, bash %s we are now  %i big" % (hash,bash,len(t) - start_t))
 
 	flatten_t, header  = listify(t)
 	csvfile = os.path.expanduser("~") + '/twitterout.csv'

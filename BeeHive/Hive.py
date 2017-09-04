@@ -25,9 +25,10 @@ class hive:
             self.conn =  sqlite3.connect(hive_loc)
             self.cusor = self.conn.cursor()
 
-            self.construct_hive_Sql()
-            self.construct_honeycomb_Sql()
-            self.construct_log_sql()
+            self.make_hive_db()
+            self.make_honeycomb_db()
+            self.make_log_db()
+            self.make_id_db()
 
         except sqlite3.Error as e:
             print("an error occurred while attempting to connect to the hive:", e.args[0])
@@ -41,7 +42,7 @@ class hive:
             except sqlite3.Error as e:
                 print("an error occurred while attempting to commit:", e.args[0])
 
-    def construct_hive_Sql(self):
+    def make_hive_db(self):
         '''create the hive db'''
         try:
             self.cursor.execut('''create table hive (
@@ -61,7 +62,7 @@ class hive:
             self.commit_hive()
         except sqlite3.Error as e:
             print("an error occurred while attempting to create the hive db:", e.args[0])
-    def construct_id_sql(self):
+    def make_id_db(self):
         try:
             self.cursor.execut('''create table id_ref(
                                         id int,
@@ -70,7 +71,7 @@ class hive:
                                         ) on commit
                                         '''
 
-    def construct_honeycomb_Sql(self):
+    def make_honeycomb_db(self):
         '''create the honeycomb db'''
         try:
             self.cursor.execut('''create table honeycomb(
@@ -88,7 +89,7 @@ class hive:
         except sqlite3.Error as e:
             print("an error occurred while attempting to create the honeycomb db:", e.args[0])
 
-    def construct_log_sql(self):
+    def make_log_db(self):
         '''create the log db'''
         try:
             self.cursor.execut('''create table honey(s
@@ -176,3 +177,5 @@ class hive:
             print("an error occurred while attempting to create a tasks id", e.args[0])
 
         return(0)
+
+    def create_comb(self, comb_dict):

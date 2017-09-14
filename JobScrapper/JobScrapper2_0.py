@@ -229,10 +229,10 @@ def get_jobid_posted(div_v, default = None):
 	#gets the unique id of the job posting
 	out_p = default
 	try:
-		#if(div_v.find_all('h2')):
-		#	for temp in div_v.find_all('h2'):
-		#		if(temp['id']):
-		#			out_p = temp['id']
+		if(div_v.find_all('h2')):
+			for temp in div_v.find_all('h2'):
+				if(temp['id']):
+					out_p = temp['id']
 	except:
 		out_p = default
 

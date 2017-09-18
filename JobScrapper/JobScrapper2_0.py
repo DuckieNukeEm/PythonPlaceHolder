@@ -1,79 +1,88 @@
 
 
 import requests
-import sqlite3
 import csv
 import re
 import os
 from datetime import datetime, timedelta
 from time import sleep
 from bs4 import BeautifulSoup
+import JobScrapperDB.py as db
 
 #note
 #any function starting with a 'get' pulls data from a subset of div:{class:row}
 #any function starting with extract pulls directly on the return result
+
+#http://blog.nycdatascience.com/student-works/web-scraping/glassdoor-web-scraping/
 indeed_URL = 'https://www.indeed.com/jobs?q='
-job_url = "title:warehouse company:amazon" #''cashier'
-location_url = '&l='
+job_url = 'cashier' #"title:warehouse company:amazon"
 limit_num = 50
 jobtype_url = None #''&jt=parttime'
 filter_url = None #'&filter=0'
 sort_url = '&sort=date'
 
 
-def create_url(base_url = 'https://www.indeed.com/jobs?q=', job = None, location = None, limit = 50, jobtype = None, sort=None, filter = None, start = None, explvl = None, return_key = False):
+def create_url(base_url = 'https://www.indeed.com/jobs?q=', job = None, location = None, limit = 50, jobtype = None, company = None, salary = None, explvl = None, radius = None, sort = None, filter = None, start = None,, return_key = False):
 	# URL = 'https://www.indeed.com/jobs?q=data+scientist&l=New+York&limit=50'
-	# &limit is the number of results to return, it maxes out at 50
-	# &l is location (either city, city state, state, zipcode, or national)
-	# &jt is job type (parttime, fulltime, contract,temporary,internship,commission)
-	# &rbc is company (follows directly location)
-	# &explvl is experince level (mid_level,entry_level,senior_level)
-	# &filter do we want to hide similar results?
-	# &sort sorts by date or relevance
-	url_key = ['','','','','','','','']
+	# &limit= is the number of results to return, it maxes out at 50
+	# &l= is location (either city, city state, state, zipcode, or national)
+	# &jt= is job type (parttime, fulltime, contract,temporary,internship,commission)
+	# &rbc= is company (follows directly location)
+	# &explvl= is experince level (mid_level,entry_level,senior_level)
+	# &filter= do we want to hide similar results?
+	# &sort= sorts by date or relevance
+	# &radius= sets the radius of how far to search (natural default is 25mi
+
+	url_key = ['','','','','','','']
 	if(job != None):
 		base_url = base_url + job
 		url_key[0] = job
+
+	if(salary != None):
+		base_url = base_url + '+' + salary
+		salary = salary.replace('$','').replace(',','')
+		url_key[1] = int(salary)
+
 	if(location != None):
 		base_url = base_url + '&l=' + location
-		url_key[1] = location
-	if(limit != None):
-		if(limit not in [10,20,30,40,50]):
-			limit = 50
-		base_url = base_url + '&limite' + str(limit)
-		url_key[2] = str(limit)
+		url_key[2] = location
+
 	if(jobtype != None):
 		if(jobtype in ['parttime','fulltime','contract','temporary','internship','commission']):
 			base_url = base_url + '&jt=' + jobtype
 			url_key[3] = jobtype
 		else:
 			print('JobType isnt in the standard list of job types')
+
+	if(company != None):
+		base_url = base_url + '&rbc=' + company
+		url_key[4] = company
+
+	if (explvl != None and explvl in ['mid_level', 'entry_level', 'senior_level']):
+		base_url = base_url + '&explvl=' + explvl
+		url_key[5] = explvl
+
+	if (radius != None and radius in [5, 10, 15, 25, 50, 100]):
+		base_url = base_url + '&radius=' + str(radius)
+		url_key[6] = radius
+
 	if(sort != None and sort in ['date','relevance']):
 		base_url = base_url + '&sort=' + sort
-		url_key[4] = sort
+
 	if(filter != None and filter in [0,1]):
 		base_url = base_url + '&filter=' + str(filter)
-		url_key[5] = str(filter)
-	if(explvl != None and explvl in ['mid_level','entry_level','senior_level']):
-		base_url = base_url + '&explvl=' + explvl
-		url_key[6] = explvl
+
 	if(start != None):
 		base_url = base_url + '&start=' + str(start)
-		url_key[7] = str(start)
 
+	if (limit != None):
+		if(limit not in [10, 20, 30, 40, 50]):
+			limit = 50
+		base_url = base_url + '&limit=' + str(limit)
 	if(return_key):
-		return(([base_url], '-'.join(url_key)))
+		return(([base_url], '|'.join(url_key)))
 	else:
 		return([base_url])
-
-#URL = 'https://www.indeed.com/jobs?q=data+scientist&l=New+York&limit=50'
-#&limit is the number of results to return, it maxes out at 50
-#&l is location (either city, city state, state, zipcode, or national)
-#&jt is job type (parttime, fulltime, contract,temporary,internship,commission)
-#&rbc is company (follows directly location)
-#&explvl is experince level (mid_level,entry_level,senior_level)
-#&filter do we want to hide similar results?
-#&sort sorts by date or relevance
 
 def call_website(URL, counter = 0):
 	#hits a weburl and convert it's using BS
@@ -101,8 +110,6 @@ def call_website(URL, counter = 0):
 		soup_obj = False
 
 	return(soup_obj)
-
-#http://blog.nycdatascience.com/student-works/web-scraping/glassdoor-web-scraping/
 
 def cln_txt(soup):
 	try:
@@ -132,10 +139,14 @@ def get_wage_posted(div_v, default = None):
 			else:
 				out_temp = div_v.find_all(["div","span"])
 				for temp in out_temp:
-					if ("$" in clean_txt(temp) and len(str(temp))<90):
+					if ("$" in cln_txt(temp) and len(str(temp))<90):
 						out_p = temp
-				if(not out_p):
-					out_p = default
+				if(out_p == None):
+					#I'm going to scan through ALL the text looking for a wage rate!
+					out_p = clean_for_wages(cln_txt(div_v))
+					if(out_p == 0):
+						out_p = default
+
 		else:
 			out_p = out_p.text
 	except:
@@ -229,10 +240,8 @@ def get_jobid_posted(div_v, default = None):
 	#gets the unique id of the job posting
 	out_p = default
 	try:
-		if(div_v.find_all('h2')):
-			for temp in div_v.find_all('h2'):
-				if(temp['id']):
-					out_p = temp['id']
+		#Damn, that's pretty f'cking simple
+		out_p = div_v['id']
 	except:
 		out_p = default
 
@@ -247,7 +256,7 @@ def get_experince_posted(div_v, default = None):
 	out_p = cln_txt(out_p)
 	return(out_p)
 
-def extract_jobposting_from_soup(div_v, default = 'N/A'):
+def extract_jobposting_from_soup(div_v, default = 'N/A', search_for_wages = False):
 	#extracts the relevant information from each job posting
 	job =[get_jobid_posted(div_v),				#JobID
 	find_date_posted(get_date_posted(div_v)),	#PostedDate
@@ -261,8 +270,8 @@ def extract_jobposting_from_soup(div_v, default = 'N/A'):
 	get_onsite_posted(div_v),					#on site?
 	#get_addurl_posted(div_v),					#add URL
 	get_companyurl_posted(div_v)]				#CompanyURL
-
-	job = check_for_wages(job)
+	if(search_for_wages):
+		job = check_for_wages(job)
 	return(job)
 
 def extract_similar_jobs(soup):
@@ -296,13 +305,17 @@ def extract_num_of_jobs_listing(soup):
 	count_list.append(n_count)
 	return(count_list)
 
-def extract_salary_groups(soup):
+def extract_salary_groups(soup, return_value = 'title'):
 	#pulls salary counts by groupings
-	salary_group = ['Salary Group']
+	if return_value == 'title':
+		salary_group = ['Salary Group']
+	else:
+		salary_group = []
+
 	if(soup.find(name = 'div', attrs = {'id':'SALARY_rbo'})):
-		for temp1 in soup.find_all(name = 'div', attrs = {'id':'SALARY_rbo'}):
-			for temp2 in temp1.find_all('a'):
-				salary_group.append(temp2['title'])
+		for ttt in soup.find_all(name = 'div', attrs = {'id':'SALARY_rbo'}):
+			for aaa in ttt.find_all('a'):
+				salary_group.append(aaa[return_value])
 	return(salary_group)
 
 def extract_job_salary_range(soup):
@@ -334,23 +347,43 @@ def extract_job_salary_range(soup):
 	except:
 		return
 
-def extract_jobtype_counts(soup):
+def extract_jobtype_counts(soup, return_value = 'title'):
 	#extracts count for full time, part time, temp, contractor, etc of the job positiosn
-	out_l = ['JobType Count']
+	if return_value == 'title':
+		out_l = ['JobType Count']
+	else:
+		out_l = []
+
 	if(soup.find(name = 'div', attrs = {'id':'JOB_TYPE_rbo'})):
 		for ttt in  soup.find_all(name = 'div', attrs = {'id':'JOB_TYPE_rbo'}):
 			for aaa in ttt.find_all("a"):
-				out_l.append(aaa['title'])
+				out_l.append(aaa[return_value])
 	return(out_l)
 
-def commit(cursor = None):
-	if cursor == None:
-		print("Can't commit, their is no connection open")
+def extract_experience_counts(soup, return_value = 'title'):
+	#extracts the experience level (entry, mid,	and on other one
+	if return_value == 'title':
+		out_l = ['experience level Count']
 	else:
-		try:
-			cursor.commit()
-		except sqlite3.Error as e:
-			print("an error occurred while attempting to commit:", e.args[0])
+		out_l = []
+
+	if (soup.find(name='div', attrs={'id': 'EXP_LVL_rbo'})):
+		for ttt in soup.find_all(name='div', attrs={'id': 'EXP_LVL_rbo'}):
+			for aaa in ttt.find_all("a"):
+				out_l.append(aaa[return_value])
+	return (out_l)
+
+def extract_company_counts(soup, return_value = 'title'):
+	#This will pull out the companys that are available with the counts for each
+	if return_value == 'title':
+		out_l = ['Company Counts']
+	else:
+		out_l = []
+	if (soup.find(name='div', attrs={'id': 'COMPANY_rbo'})):
+		for ttt in soup.find_all(name='div', attrs={'id': 'COMPANY_rbo'}):
+			for aaa in ttt.find_all("a"):
+				out_l.append(aaa[return_value])
+	return (out_l)
 
 def check_for_wages(in_list, wage_index = 3):
 	#a function that runs through a list, and looks for $, then does a check and moves that into wages (if wages is null
@@ -397,7 +430,7 @@ def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, 
 		if(auto_clean):
 			if(i < 80 and i > 8.0):
 				found.append(i)
-			elif(i < 200000 and i > 10000):
+			elif(i < 300000 and i > 10000):
 				found.append(i)
 		else:
 			if(i < upper_limit and i > lower_limit):
@@ -434,37 +467,6 @@ def find_date_posted(in_s):
 	except:
 		return(today.strftime(fmt))
 
-def connect_to_storage_db(loc):
-	#Connect to a location to store the data in SQLLiteDB
-	conn = sqlite3.connect(loc)
-	cursor = self.conn.cursor()
-	return(conn, cursor)
-
-def create_job_posting_table(cursor):
-	cursor.execute('''create table job_posting(
-					SearchKey Text,
-					Date_Searched Date,
-					JobID  Text,
-	 				PostedDate Date,
-					JobRole Text,
-					Wage Text,
-					Location Text,
-					Employer Text,
-					Summary Text,
-					Experince Text,
-					Sponsored_Ad Text,
-					OnSite Text,
-					AddURL Text,
-					CompanyURL Text,
-					PRIMARY KEY (JobID, SearchKey)'''
-				   )
-	commmit(cursor)
-
-
-def create_stats_table(cursor):
-	#creates the cursor table
-	cursor.execute
-
 def extract_next_links(soup, NEXT = False, start_URL = 'http://indeed.com', addurl = ''):
 	#find what the next links will be
 	next_links = []
@@ -486,6 +488,78 @@ def extract_next_links(soup, NEXT = False, start_URL = 'http://indeed.com', addu
 		return(next_links)
 	return(next_links)
 
+def link_to_linkid(URL):
+	#this takes a link and extracts the link ID on it
+	#doing splits on the ?
+	order_dict = {'q':0,
+				  '+':1, #This is the odd man out, becuase they drop it directly into the searchURL
+				  'l':2,
+				  'jt':3,
+				  'rbc':4,
+				  'explvl':5,
+				  'radius':6
+				  }
+
+	if(type(URL)!=str):
+		return(str(URL))
+
+	URL_split = ['','','','','','','']
+	for u in URL.split('?'):
+		u_split = u.split('=')
+		index = order_dict.get(u_split[0],99)
+		if(index < len(order_dict)):
+			URL_split[index] = u_split[1]
+	if(URL_split[0] != ''):
+		wage = clean_for_wages(URL_split[1])
+		if(wage!='')
+			URL_split[1] = str(wage)
+			jobsplit = URL_split[0].split('+')
+			if(len(jobsplit) == 1):  #there's no job, it's just a salary search
+				URL_split[0] = ''
+			else:
+				URL_split[0] = '+'.join(jobsplit[:(len(jobsplit)-1)])
+	return('|'.join(URL_split))
+
+def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None ):
+	#this function will take the start URL, and then will cut the data by every option to get the deepest refinment of the data
+	#it will be this we walk down the file
+	#we will first walk it by Company, then by Job, then by Salary Group, then by experience
+	sleep(1)
+	print(START_URL)
+	if(START_URL[0:4] == 'http'):
+		soup_obj = call_website(START_URL)
+	else:
+		soup_obj = call_website(PREPEND_URL + START_URL)
+
+	return_list = []
+	#first, a list of compnay URLS
+	COMPANY_URL_LIST =  extract_company_counts(soup_obj, return_value='href')
+	#then JOB_LIST
+	JOB_URL_LIST = extract_jobtype_counts(soup_obj, return_value='href')
+	#then Salary
+	SALARY_URL_LIST = extract_salary_groups(soup_obj, return_value='href')
+	#and finally, experience level
+	XP_URL_LIST = extract_experience_counts(soup_obj, return_value = 'href')
+	if(COMPANY_URL_LIST != []):
+		for l in COMPANY_URL_LIST:
+			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
+	elif(JOB_URL_LIST != []):
+		for l in JOB_URL_LIST:
+			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
+	elif(SALARY_URL_LIST != []):
+		print(SALARY_URL_LIST)
+		for l in SALARY_URL_LIST:
+			print('now checking %r' % l)
+			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
+	elif(XP_URL_LIST != []):
+		print(XP_URL_LIST)
+		for l in XP_URL_LIST:
+			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
+	else:
+		return([PREPEND_URL + START_URL])
+
+	return(return_list)
+	#now gotta flatten the list to pass up
 
 
 if __name__ == "__main__":
@@ -499,6 +573,8 @@ if __name__ == "__main__":
 	myPrintCounter = 0
 	page_limit = 100
 
+	job_cursor, job_conn = connect_to_storage_db('c:/scripts/job_posting.sqlite')
+
 	#clearing the data files
 	try:
 		os.remove(write_path)
@@ -509,8 +585,8 @@ if __name__ == "__main__":
 	for Zip in Zip_l:
 		current_page = 0
 		basic_stats=[]
-		URL,URL_ID = create_url(job = job_url, location = Zip, limit = limit_num, jobtype  = jobtype_url, return_key=True)
-		print(URL)
+		URL,URL_ID = create_url(job = job_url, location = Zip, limit = limit_num,  return_key=True)
+
 		return_data = []
 		while current_page < page_limit and len(URL) > 0:
 

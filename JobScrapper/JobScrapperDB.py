@@ -4,11 +4,17 @@ db layout
 '''
 import sqlite3
 from re import findall
+from datatime import datatime
 
 def get_numbers(in_s):
     in_s = in_s.replace(',', '').upper()
     in_s = findall(r'\d+\.?\d*', in_s)
     return(in_s)
+
+def now():
+    fmt = '%Y-%m-%d'
+    today = datetime.today()
+    return(today.strftime(fmt))
 
 def connect_to_storage_db(loc):
     # Connect to a location to store the data in SQLLiteDB
@@ -61,6 +67,27 @@ def create_job_posting_table(cursor):
 					)'''
                    )
     commmit(cursor)
+
+def lisf_of_list(in_l):
+    #Checks if a list is a list of list or just a list
+    if any(isinstance(s, list) for s in in_l):
+        return(True)
+    else:
+        return(False)
+
+def insert_into_job_posting(data, cursor):
+    #a function that will drop the data into
+    if(list_of_list(data)):
+        for l in data:
+            input_data = l[0] + [now()] + l[:len(l)] #inserting current date
+            cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+    else:
+        input_data = data[0] + [now()] + data[:len(data)]
+        cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+
+        
+    commit(cursor)
+
 
 def create_stats_table(cursor):
     cursor.execute('''

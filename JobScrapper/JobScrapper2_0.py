@@ -504,20 +504,31 @@ def link_to_linkid(URL):
 		return(str(URL))
 
 	URL_split = ['','','','','','','']
-	for u in URL.split('?'):
+
+	#splitting off the original 'hhtps://www.indeed.com crap
+	URL = URL.replace('+',' ')
+	URL = URL.split('?')
+	if(len(URL) == 2):
+		URL = URL[1].split('&')
+	else:
+		URL = URL[0].split('&')
+
+	for u in URL:
 		u_split = u.split('=')
 		index = order_dict.get(u_split[0],99)
 		if(index < len(order_dict)):
 			URL_split[index] = u_split[1]
+
+	#Now  pulling out salary from Job Code (if it exists)
 	if(URL_split[0] != ''):
-		wage = clean_for_wages(URL_split[1])
-		if(wage!='')
-			URL_split[1] = str(wage)
-			jobsplit = URL_split[0].split('+')
+		wage = clean_for_wages(URL_split[0])
+		if(wage!=''):
+			URL_split[1] = str(int(wage))
+			jobsplit = URL_split[0].split('$')
 			if(len(jobsplit) == 1):  #there's no job, it's just a salary search
 				URL_split[0] = ''
 			else:
-				URL_split[0] = '+'.join(jobsplit[:(len(jobsplit)-1)])
+				URL_split[0] = ' '.join(jobsplit[:(len(jobsplit)-1)]).strip()
 	return('|'.join(URL_split))
 
 def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None ):
@@ -562,13 +573,73 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 	#now gotta flatten the list to pass up
 
 
-if __name__ == "__main__":
+def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_limit = 100, cursor = None, verbos = True, save_loc = "~"):
+	#This is the function that runs the will actuall scrap Indeed.com to find
+
+	if(Output_to_db == False):
+		write_path = save_loc + 'output.txt'
+		write_stats = save_loc + 'stats.txt'
+
+	#lets get the list of URL that we need to use:
+	URL_list = walk_url_trees(URL)
+
+	for url in URL_list:
+		URL_ID = link_to_linkid(url)
+		Page_Count = 0
+		cur_url = url
+		data = []
+		basic_stats = []
+		while(Page_limit > Page_Count):
+			sleep(1)
+			if(verbose):
+				print('working on %r of %r, with URl %r' % (current_page, page_limit, cur_url))
+			soup_obj = call_website(cur_url)
+
+			if (soup_obj == False or soup_obj.find_all("div", {"class": "bad_query"})):
+				# is the data good
+				break
+			if (Get_Stats and current_page == 0):
+				basic_stats.append([URL_ID, extract_similar_jobs(soup_obj)])
+				basic_stats.append([URL_ID, extract_job_salary_range(soup_obj)])
+				basic_stats.append([URL_ID, extract_jobtype_counts(soup_obj)])
+				basic_stats.append([URL_ID, extract_num_of_jobs_listing(soup_obj)])
+				basic_stats.append([URL_ID, extract_salary_groups(soup_obj)])
+
+			# breaking down soup to div
+			soup_div = soup_obj.find_all('div', attrs={'class': ['row', 'request']})
+			for div in soup_div:
+				data.append([URL_ID, extract_jobposting_from_soup(div)])
+			# getting next round of URL's to use
+			if(Next):
+				next_URL = extract_next_links(soup_obj, NEXT=True)
+				if(next_URL != ''):
+					break
+				else:
+					cur_url = next_URL
+			else:
+				break
+			current_page = current_page + 1
+		if(Output_to_db == False): #If we don't want to save the infomariotn to da data base
+			if(verbose):
+				print("Now Saving dataa")
+			#saving it to a tempory Location
+			with open(write_path, 'a') as c:
+				writer = csv.writer(c, lineterminator='\n', delimiter='|')
+				writer.writerows(data)
+			with open(write_stats, 'a') as c:
+				writer = csv.writer(c, lineterminator='\n', delimiter='|')
+				writer.writerows(basic_stats)
+
+
+
+
+if __name__ == "__notmain__":
 	temp_start = 'c:/scripts/' # '/home/asmodi/'
 	write_path = temp_start + 'output.txt'
 	write_stats = temp_start + 'stats.txt'
 	Zip_l = ['90210','10001',]
-	print "Starting ..."
-	print "\nStarting data scraping ..."
+	print "Starting ...\n"
+	print "Starting data scraping ..."
 	myLoopZipCounter = 0
 	myPrintCounter = 0
 	page_limit = 100
@@ -585,7 +656,8 @@ if __name__ == "__main__":
 	for Zip in Zip_l:
 		current_page = 0
 		basic_stats=[]
-		URL,URL_ID = create_url(job = job_url, location = Zip, limit = limit_num,  return_key=True)
+		URL,URL_ID = create_url(job = job_url, location = Zip, limit = limit_num)
+
 
 		return_data = []
 		while current_page < page_limit and len(URL) > 0:
@@ -622,5 +694,38 @@ if __name__ == "__main__":
 			writer = csv.writer(c, lineterminator='\n', delimiter = '|')
 			writer.writerows(basic_stats)
 
+elif __name__ == "__main__":
+	temp_start = 'c:/scripts/'  # '/home/asmodi/'
+	write_path = temp_start + 'output.txt'
+	write_stats = temp_start + 'stats.txt'
+	job_url = ['company%3A"Publix"',
+			   'company%3A"Dollar+General"',
+			   'company%3A"Target"',
+			   'comapny%3A"Aldi"',
+			   'comapny%3A"Kroger"',
+			   'company%3A"Lowe%27s"',
+			   'company%3A"McDonald%27s"']
+				#the %27 is for the appostrofy (like in Lowe's)
+				#the %3A is a colon
 
+	print "Starting ...\n"
+	print "Starting data scraping ..."
+	myLoopZipCounter = 0
+	myPrintCounter = 0
+	page_limit = 100
 
+	job_cursor, job_conn = connect_to_storage_db('c:/scripts/job_posting.sqlite')
+
+	# clearing the data files
+	try:
+		os.remove(write_path)
+		os.remove(write_stats)
+	except:
+		print('couldnt deleter the file, oh well')
+
+	for job in job_url:
+		URL, URL_ID = create_url(job=job, location='', limit=limit_num)
+		scrape_indeed(URL, save_loc="c:/scripts")
+
+else:
+	print("well.....poop")

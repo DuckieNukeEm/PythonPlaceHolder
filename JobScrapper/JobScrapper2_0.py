@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta
 from time import sleep
 from bs4 import BeautifulSoup
-import JobScrapperDB.py as db
+import JobScrapperDB as db
 
 #note
 #any function starting with a 'get' pulls data from a subset of div:{class:row}
@@ -22,7 +22,7 @@ filter_url = None #'&filter=0'
 sort_url = '&sort=date'
 
 
-def create_url(base_url = 'https://www.indeed.com/jobs?q=', job = None, location = None, limit = 50, jobtype = None, company = None, salary = None, explvl = None, radius = None, sort = None, filter = None, start = None,, return_key = False):
+def create_url(base_url = 'https://www.indeed.com/jobs?q=', job = None, location = None, limit = 50, jobtype = None, company = None, salary = None, explvl = None, radius = None, sort = None, filter = None, start = None, return_key = False):
 	# URL = 'https://www.indeed.com/jobs?q=data+scientist&l=New+York&limit=50'
 	# &limit= is the number of results to return, it maxes out at 50
 	# &l= is location (either city, city state, state, zipcode, or national)
@@ -540,7 +540,10 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 	if(START_URL[0:4] == 'http'):
 		soup_obj = call_website(START_URL)
 	else:
-		soup_obj = call_website(PREPEND_URL + START_URL)
+		if(isinstance(START_URL, list)):
+			soup_obj = call_website(PREPEND_URL + START_URL[0])
+		else:
+			soup_obj = call_website(PREPEND_URL + START_URL)
 
 	return_list = []
 	#first, a list of compnay URLS
@@ -582,7 +585,7 @@ def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_
 
 	#lets get the list of URL that we need to use:
 	URL_list = walk_url_trees(URL)
-
+	print(URL_list)
 	for url in URL_list:
 		URL_ID = link_to_linkid(url)
 		Page_Count = 0
@@ -644,7 +647,7 @@ if __name__ == "__notmain__":
 	myPrintCounter = 0
 	page_limit = 100
 
-	job_cursor, job_conn = connect_to_storage_db('c:/scripts/job_posting.sqlite')
+	job_cursor, job_conn = db.connect_to_storage_db('c:/scripts/job_posting.sqlite')
 
 	#clearing the data files
 	try:
@@ -714,7 +717,7 @@ elif __name__ == "__main__":
 	myPrintCounter = 0
 	page_limit = 100
 
-	job_cursor, job_conn = connect_to_storage_db('c:/scripts/job_posting.sqlite')
+	job_cursor, job_conn = db.connect_to_storage_db('c:/scripts/job_posting.sqlite')
 
 	# clearing the data files
 	try:
@@ -724,8 +727,8 @@ elif __name__ == "__main__":
 		print('couldnt deleter the file, oh well')
 
 	for job in job_url:
-		URL, URL_ID = create_url(job=job, location='', limit=limit_num)
-		scrape_indeed(URL, save_loc="c:/scripts")
+		URL = create_url(job=job, location='', limit = None)
+		scrape_indeed(URL, save_loc="c:/scripts/")
 
 else:
 	print("well.....poop")

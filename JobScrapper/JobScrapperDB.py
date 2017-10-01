@@ -4,7 +4,7 @@ db layout
 '''
 import sqlite3
 from re import findall
-from datatime import datatime
+from datetime import datetime
 
 def get_numbers(in_s):
     in_s = in_s.replace(',', '').upper()
@@ -116,14 +116,14 @@ def create_searchKey_ref_table(cursor):
                 Experience text,
                 Redius int,
                 PRIMARY KEY (SearchKey)                
-                )'''
+                )''')
     commit(cursor)
 
 def insert_new_searchKey(Key, cursor):
     #takes a Key and inserts it into the SearchKey Ref Table
     Key_split = Key + Key.split('|')
 
-    if(len(Key_split) != 7 )
+    if(len(Key_split) != 7 ):
         print('Couldnt insert new Key, not enough elements')
         return(False)
 

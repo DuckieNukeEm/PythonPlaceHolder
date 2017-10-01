@@ -139,7 +139,7 @@ def get_wage_posted(div_v, default = None):
 			else:
 				out_temp = div_v.find_all(["div","span"])
 				for temp in out_temp:
-					if ("$" in cln_txt(temp) and len(str(temp))<90):
+					if ("$" in cln_txt(temp) and len(str(temp))<90 and 'http' not in cln_txt(temp)):
 						out_p = temp
 				if(out_p == None):
 					#I'm going to scan through ALL the text looking for a wage rate!
@@ -256,6 +256,13 @@ def get_experince_posted(div_v, default = None):
 	out_p = cln_txt(out_p)
 	return(out_p)
 
+def is_bool(item):
+	#simple thing to check if a thing is a boolian object
+	if(isinstance(item, bool)):
+		return(True)
+	else:
+		return(False)
+
 def extract_jobposting_from_soup(div_v, default = 'N/A', search_for_wages = False):
 	#extracts the relevant information from each job posting
 	job =[get_jobid_posted(div_v),				#JobID
@@ -311,7 +318,8 @@ def extract_salary_groups(soup, return_value = 'title'):
 		salary_group = ['Salary Group']
 	else:
 		salary_group = []
-
+	if (is_bool(soup)):
+		return (out_l)
 	if(soup.find(name = 'div', attrs = {'id':'SALARY_rbo'})):
 		for ttt in soup.find_all(name = 'div', attrs = {'id':'SALARY_rbo'}):
 			for aaa in ttt.find_all('a'):
@@ -353,12 +361,16 @@ def extract_jobtype_counts(soup, return_value = 'title'):
 		out_l = ['JobType Count']
 	else:
 		out_l = []
-
-	if(soup.find(name = 'div', attrs = {'id':'JOB_TYPE_rbo'})):
-		for ttt in  soup.find_all(name = 'div', attrs = {'id':'JOB_TYPE_rbo'}):
-			for aaa in ttt.find_all("a"):
-				out_l.append(aaa[return_value])
-	return(out_l)
+	if (is_bool(soup)):
+		return (out_l)
+	try:
+		if(soup.find(name = 'div', attrs = {'id':'JOB_TYPE_rbo'})):
+			for ttt in  soup.find_all(name = 'div', attrs = {'id':'JOB_TYPE_rbo'}):
+				for aaa in ttt.find_all("a"):
+					out_l.append(aaa[return_value])
+		return(out_l)
+	except:
+		return (out_l)
 
 def extract_experience_counts(soup, return_value = 'title'):
 	#extracts the experience level (entry, mid,	and on other one
@@ -366,12 +378,16 @@ def extract_experience_counts(soup, return_value = 'title'):
 		out_l = ['experience level Count']
 	else:
 		out_l = []
-
-	if (soup.find(name='div', attrs={'id': 'EXP_LVL_rbo'})):
-		for ttt in soup.find_all(name='div', attrs={'id': 'EXP_LVL_rbo'}):
-			for aaa in ttt.find_all("a"):
-				out_l.append(aaa[return_value])
-	return (out_l)
+	if (is_bool(soup)):
+		return (out_l)
+	try:
+		if (soup.find(name='div', attrs={'id': 'EXP_LVL_rbo'})):
+			for ttt in soup.find_all(name='div', attrs={'id': 'EXP_LVL_rbo'}):
+				for aaa in ttt.find_all("a"):
+					out_l.append(aaa[return_value])
+		return (out_l)
+	except:
+		return (out_l)
 
 def extract_company_counts(soup, return_value = 'title'):
 	#This will pull out the companys that are available with the counts for each
@@ -379,6 +395,9 @@ def extract_company_counts(soup, return_value = 'title'):
 		out_l = ['Company Counts']
 	else:
 		out_l = []
+
+	if(is_bool(soup)):
+		return(out_l)
 	if (soup.find(name='div', attrs={'id': 'COMPANY_rbo'})):
 		for ttt in soup.find_all(name='div', attrs={'id': 'COMPANY_rbo'}):
 			for aaa in ttt.find_all("a"):
@@ -406,7 +425,7 @@ def check_for_wages(in_list, wage_index = 3):
 
 	return(in_list)
 
-def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, method = 'first'):
+def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, method = 'first', exclude_http = True):
 	#cleans a string and only pulls out hte wage amount
 	#wage_Type = 'H' is hourly wages, 'S" is salaried wages
 	#method = first pulls the first occurence of wage, or method - average averages all occurens together
@@ -415,10 +434,13 @@ def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, 
 
 	in_s = in_s.replace(',','').upper()
 	#removing some common issues with the data
-	if('BILLION' in in_s or 'MILLION' in in_s):
+	if('BILLION' in in_s or 'MILLION' in in_s ):
 		return(0)
 	if('$' not in in_s):
 		return(0)
+	if(exclude_http):
+		if('HTTP' in in_s):
+			return(0)
 	#print(in_s)
 	found =[]
 	for i in re.findall(r'\$+\s*\d+\.?\d*',in_s): #I've added the '$' to make SURE IT"S A DOLLAR AMOUNT!!!
@@ -492,7 +514,7 @@ def link_to_linkid(URL):
 	#this takes a link and extracts the link ID on it
 	#doing splits on the ?
 	order_dict = {'q':0,
-				  '+':1, #This is the odd man out, becuase they drop it directly into the searchURL
+				  '+':1, #This is the odd man out, becuase they drop thew ages directly into the searchURL
 				  'l':2,
 				  'jt':3,
 				  'rbc':4,
@@ -521,7 +543,7 @@ def link_to_linkid(URL):
 
 	#Now  pulling out salary from Job Code (if it exists)
 	if(URL_split[0] != ''):
-		wage = clean_for_wages(URL_split[0])
+		wage = clean_for_wages(URL_split[0], exclude_http=False)
 		if(wage!=''):
 			URL_split[1] = str(int(wage))
 			jobsplit = URL_split[0].split('$')
@@ -537,13 +559,16 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 	#we will first walk it by Company, then by Job, then by Salary Group, then by experience
 	sleep(1)
 	print(START_URL)
+
+	#if a list was passed, I just want to ttake the first element of the list
+	if (isinstance(START_URL, list)):
+		START_URL = START_URL[0]
+
 	if(START_URL[0:4] == 'http'):
 		soup_obj = call_website(START_URL)
 	else:
-		if(isinstance(START_URL, list)):
-			soup_obj = call_website(PREPEND_URL + START_URL[0])
-		else:
-			soup_obj = call_website(PREPEND_URL + START_URL)
+		soup_obj = call_website(PREPEND_URL + START_URL)
+
 
 	return_list = []
 	#first, a list of compnay URLS
@@ -561,12 +586,9 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 		for l in JOB_URL_LIST:
 			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
 	elif(SALARY_URL_LIST != []):
-		print(SALARY_URL_LIST)
 		for l in SALARY_URL_LIST:
-			print('now checking %r' % l)
 			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
 	elif(XP_URL_LIST != []):
-		print(XP_URL_LIST)
 		for l in XP_URL_LIST:
 			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
 	else:
@@ -576,7 +598,7 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 	#now gotta flatten the list to pass up
 
 
-def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_limit = 100, cursor = None, verbos = True, save_loc = "~"):
+def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page_limit = 100, cursor = None, verbos = True, save_loc = "~", walk_tree = True):
 	#This is the function that runs the will actuall scrap Indeed.com to find
 
 	if(Output_to_db == False):
@@ -584,7 +606,10 @@ def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_
 		write_stats = save_loc + 'stats.txt'
 
 	#lets get the list of URL that we need to use:
-	URL_list = walk_url_trees(URL)
+	if(walk_tree):
+		URL_list = walk_url_trees(URL)
+	else:
+		URL_list = URL
 	print(URL_list)
 	for url in URL_list:
 		URL_ID = link_to_linkid(url)
@@ -594,14 +619,14 @@ def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_
 		basic_stats = []
 		while(Page_limit > Page_Count):
 			sleep(1)
-			if(verbose):
-				print('working on %r of %r, with URl %r' % (current_page, page_limit, cur_url))
+			if(verbos):
+				print('working on %r of %r, with URl %r' % (Page_Count, page_limit, cur_url))
 			soup_obj = call_website(cur_url)
 
 			if (soup_obj == False or soup_obj.find_all("div", {"class": "bad_query"})):
 				# is the data good
 				break
-			if (Get_Stats and current_page == 0):
+			if (Get_Stats and Page_Count == 0):
 				basic_stats.append([URL_ID, extract_similar_jobs(soup_obj)])
 				basic_stats.append([URL_ID, extract_job_salary_range(soup_obj)])
 				basic_stats.append([URL_ID, extract_jobtype_counts(soup_obj)])
@@ -618,12 +643,12 @@ def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_
 				if(next_URL != ''):
 					break
 				else:
-					cur_url = next_URL
+					cur_url = next_URL[0]
 			else:
 				break
-			current_page = current_page + 1
+				Page_Count = Page_Count + 1
 		if(Output_to_db == False): #If we don't want to save the infomariotn to da data base
-			if(verbose):
+			if(verbos):
 				print("Now Saving dataa")
 			#saving it to a tempory Location
 			with open(write_path, 'a') as c:
@@ -637,9 +662,9 @@ def scrape_indeed(URL, Get_Stas = True, Output_to_db = False, Next = True, Page_
 
 
 if __name__ == "__notmain__":
-	temp_start = 'c:/scripts/' # '/home/asmodi/'
-	write_path = temp_start + 'output.txt'
-	write_stats = temp_start + 'stats.txt'
+	save_loc = 'c:/scripts/' # '/home/asmodi/'
+	write_path = save_loc + 'output.txt'
+	write_stats = save_loc + 'stats.txt'
 	Zip_l = ['90210','10001',]
 	print "Starting ...\n"
 	print "Starting data scraping ..."
@@ -697,15 +722,17 @@ if __name__ == "__notmain__":
 			writer = csv.writer(c, lineterminator='\n', delimiter = '|')
 			writer.writerows(basic_stats)
 
-elif __name__ == "__main__":
-	temp_start = 'c:/scripts/'  # '/home/asmodi/'
-	write_path = temp_start + 'output.txt'
-	write_stats = temp_start + 'stats.txt'
+if __name__ == "__main__":
+	save_loc = 'c:/scripts/'  # '/home/asmodi/'
+
+	write_path = save_loc + 'output.txt'
+	write_stats = save_loc + 'stats.txt'
+	db_loc = save_loc + 'job_posting.sqlite'
 	job_url = ['company%3A"Publix"',
 			   'company%3A"Dollar+General"',
 			   'company%3A"Target"',
-			   'comapny%3A"Aldi"',
-			   'comapny%3A"Kroger"',
+			   'company%3A"Aldi"',
+			   'company%3A"Kroger"',
 			   'company%3A"Lowe%27s"',
 			   'company%3A"McDonald%27s"']
 				#the %27 is for the appostrofy (like in Lowe's)
@@ -717,7 +744,7 @@ elif __name__ == "__main__":
 	myPrintCounter = 0
 	page_limit = 100
 
-	job_cursor, job_conn = db.connect_to_storage_db('c:/scripts/job_posting.sqlite')
+	job_cursor, job_conn = db.connect_to_storage_db(db_loc)
 
 	# clearing the data files
 	try:
@@ -727,8 +754,14 @@ elif __name__ == "__main__":
 		print('couldnt deleter the file, oh well')
 
 	for job in job_url:
+		print("working on %r" %job)
 		URL = create_url(job=job, location='', limit = None)
-		scrape_indeed(URL, save_loc="c:/scripts/")
+		scrape_indeed(URL, save_loc=save_loc)
+	for job in job_url: #yes, I'm doing this twice, once wehre I walk the tree, the second time where I just hit every job posting
+		print("working on %r" % job)
+		URL = create_url(job=job, location='', limit=None)
+		scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
+		scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
 
 else:
 	print("well.....poop")

@@ -640,13 +640,13 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 			# getting next round of URL's to use
 			if(Next):
 				next_URL = extract_next_links(soup_obj, NEXT=True)
-				if(next_URL != ''):
+				if(next_URL == [] or next_URL[0] == ''):
 					break
 				else:
 					cur_url = next_URL[0]
 			else:
 				break
-				Page_Count = Page_Count + 1
+			Page_Count = Page_Count + 1
 		if(Output_to_db == False): #If we don't want to save the infomariotn to da data base
 			if(verbos):
 				print("Now Saving dataa")
@@ -723,7 +723,7 @@ if __name__ == "__notmain__":
 			writer.writerows(basic_stats)
 
 if __name__ == "__main__":
-	save_loc = 'c:/scripts/'  # '/home/asmodi/'
+	save_loc = '/home/asmodi/' # 'c:/scripts/'  # '/home/asmodi/'
 
 	write_path = save_loc + 'output.txt'
 	write_stats = save_loc + 'stats.txt'

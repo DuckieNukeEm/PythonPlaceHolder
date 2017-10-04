@@ -22,8 +22,9 @@ filter_url = None #'&filter=0'
 sort_url = '&sort=date'
 
 control_dict = {
-	'EXCLUDE_HTTP_FROM_WAGES_SEARCH': True,
-	'HOT ENCODE': "utf8"
+	'EXCLUDE_HTTP_FROM_WAGES_SEARCH': True, #if, when we search for a wage, we want to exclude any links
+	'HOT ENCODE': "utf8", 					#If we want to encoude the text as utf8 upon grabbing the data
+	'PAGE LIMIT' : 500						#page limit for when we scrap the data
 }
 
 
@@ -573,9 +574,12 @@ def link_to_linkid(URL):
 			else:
 				URL_split[0] = ' '.join(jobsplit[:(len(jobsplit)-1)]).strip()
 	#doing a special search if we are straight up looking for a company:
-
+	if (c_v('HOT ENCODE')):
+		# if we want to check for a hot encode
+		URL_split = [j.encode(control_dict['HOT ENCODE']) if type(j) in (unicode,str) and j != None else j for j in URL_split]
 
 	return('|'.join(URL_split))
+
 
 def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None ):
 	#this function will take the start URL, and then will cut the data by every option to get the deepest refinment of the data
@@ -622,13 +626,14 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 	#now gotta flatten the list to pass up
 
 
-def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page_limit = 100, cursor = None, verbos = True, save_loc = "~", walk_tree = True):
+def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, cursor = None, verbos = True, save_loc = None, walk_tree = True):
 	#This is the function that runs the will actuall scrap Indeed.com to find
 
-	if(Output_to_db == False):
+	Page_limit = control_dict.get('PAGE LIMIT', 100)
+
+	if(save_loc != None):
 		write_path = save_loc + 'output.txt'
 		write_stats = save_loc + 'stats.txt'
-
 	#lets get the list of URL that we need to use:
 	if(walk_tree):
 		URL_list = walk_url_trees(URL)
@@ -637,6 +642,7 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 	for url in URL_list:
 		URL_ID = link_to_linkid(url)
 		Page_Count = 0
+
 		cur_url = url
 		data = []
 		basic_stats = []
@@ -670,9 +676,9 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 			else:
 				break
 			Page_Count = Page_Count + 1
-		if(Output_to_db == False): #If we don't want to save the infomariotn to da data base
+		if(save_loc != None): #If we don't want to save the infomariotn to da data base
 			if(verbos):
-				print("Now Saving dataa")
+				print("Saving data")
 			#saving it to a tempory Location
 			with open(write_path, 'a') as c:
 				writer = csv.writer(c, lineterminator='\n', delimiter='|')
@@ -680,7 +686,8 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 			with open(write_stats, 'a') as c:
 				writer = csv.writer(c, lineterminator='\n', delimiter='|')
 				writer.writerows(basic_stats)
-
+		if(cursor != None):
+			db.insert_into_job_posting(data,cursor)
 
 
 
@@ -701,6 +708,7 @@ if __name__ == "__notmain__":
 	try:
 		os.remove(write_path)
 		os.remove(write_stats)
+
 	except:
 		print('couldnt deleter the file, oh well')
 
@@ -766,23 +774,25 @@ if __name__ == "__main__":
 'TX','UT','VT','VA','WA','WV','WI','WY']
 	print "Starting ...\n"
 	print "Starting data scraping ..."
-	myLoopZipCounter = 0
-	myPrintCounter = 0
-	page_limit = 500
-
-	job_cursor, job_conn = db.connect_to_storage_db(db_loc)
 
 	# clearing the data files
 	try:
 		os.remove(write_path)
 		os.remove(write_stats)
+		os.remove(db_loc)
 	except:
 		print('couldnt deleter the file, oh well')
+
+
+	job_cursor, job_conn = db.connect_to_storage_db(db_loc)
+
+
 	for s in State:
+
 		for job in job_url:
 			print("working on %r in %r" %(job,s))
-			URL = create_url(job=job, location=s, limit = None)
-			scrape_indeed(URL, save_loc=save_loc)
+			URL = create_url(job=job, location=s,  limit = None )
+			scrape_indeed(URL, save_loc=save_loc,Output_to_db = True,cursor = job_cursor)
 
 		control_dict['EXCLUDE_HTTP_FROM_WAGES_SEARCH']  =False
 
@@ -791,6 +801,7 @@ if __name__ == "__main__":
 			print("working on %r in %r" % (job,s))
 			URL = create_url(job=job, location=s, limit=None)
 			scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
+
 
 
 else:

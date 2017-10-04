@@ -61,7 +61,6 @@ def create_job_posting_table(cursor):
 					Experience Text,
 					Sponsored_Ad Text,
 					OnSite Text,
-					AddURL Text,
 					CompanyURL Text,
 					PRIMARY KEY (JobID, SearchKey)
 					)'''
@@ -77,13 +76,16 @@ def lisf_of_list(in_l):
 
 def insert_into_job_posting(data, cursor):
     #a function that will drop the data into
-    if(list_of_list(data)):
-        for l in data:
-            input_data = l[0] + [now()] + l[:len(l)] #inserting current date
-            cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
-    else:
-        input_data = data[0] + [now()] + data[:len(data)]
-        cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+    try:
+        if(list_of_list(data)):
+            for l in data:
+                input_data = l[0] + [now()] + l[:len(l)] #inserting current date
+                cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+        else:
+            input_data = data[0] + [now()] + data[:len(data)]
+            cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+    except:
+        print("insert didn't work :(")
 
         
     commit(cursor)
@@ -306,7 +308,7 @@ def insert_stats_data(stats, searchDate = '1999-12-31', Key = '', cursor=None):
     else:
         print('could not formate the data nor could I insert it, lo siento buddy')
 
-def insert_into_job_posting(jobposting, searchDate = '1999-12-31', Key = '', cursor=None):
+def insert_into_job_posting2(jobposting, searchDate = '1999-12-31', Key = '', cursor=None):
     #insert job posting data into a db
     if (cursor == None):
         print('No Cursor present')

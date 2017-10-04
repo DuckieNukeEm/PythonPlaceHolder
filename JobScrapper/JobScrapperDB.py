@@ -76,17 +76,13 @@ def lisf_of_list(in_l):
 
 def insert_into_job_posting(data, cursor):
     #a function that will drop the data into
-    try:
-        if(list_of_list(data)):
-            for l in data:
-                input_data = l[0] + [now()] + l[:len(l)] #inserting current date
-                cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
-        else:
-            input_data = data[0] + [now()] + data[:len(data)]
+    if(list_of_list(data)):
+        for l in data:
+            input_data = l[0] + [now()] + l[:len(l)] #inserting current date
             cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
-    except:
-        print("insert didn't work :(")
-
+    else:
+        input_data = data[0] + [now()] + data[:len(data)]
+        cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
         
     commit(cursor)
 

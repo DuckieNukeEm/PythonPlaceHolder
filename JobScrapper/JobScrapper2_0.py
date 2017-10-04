@@ -338,7 +338,7 @@ def extract_salary_groups(soup, return_value = 'title'):
 	else:
 		salary_group = []
 	if (is_bool(soup)):
-		return (out_l)
+		return (salary_group)
 	if(soup.find(name = 'div', attrs = {'id':'SALARY_rbo'})):
 		for ttt in soup.find_all(name = 'div', attrs = {'id':'SALARY_rbo'}):
 			for aaa in ttt.find_all('a'):

@@ -746,7 +746,7 @@ if __name__ == "__notmain__":
 			writer.writerows(basic_stats)
 
 if __name__ == "__main__":
-	save_loc =  'c:/scripts/'  # '/home/asmodi/'
+	save_loc =   '/home/asmodi/' #'c:/scripts/'  #
 
 	write_path = save_loc + 'output.txt'
 	write_stats = save_loc + 'stats.txt'

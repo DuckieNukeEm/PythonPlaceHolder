@@ -21,6 +21,11 @@ jobtype_url = None #''&jt=parttime'
 filter_url = None #'&filter=0'
 sort_url = '&sort=date'
 
+control_dict = {
+	'EXCLUDE_HTTP_FROM_WAGES_SEARCH': True,
+	'HOT ENCODE': "utf8"
+}
+
 
 def create_url(base_url = 'https://www.indeed.com/jobs?q=', job = None, location = None, limit = 50, jobtype = None, company = None, salary = None, explvl = None, radius = None, sort = None, filter = None, start = None, return_key = False):
 	# URL = 'https://www.indeed.com/jobs?q=data+scientist&l=New+York&limit=50'
@@ -128,6 +133,11 @@ def get_date_posted(div_v, default = None):
 	out_p = cln_txt(out_p)
 	return(out_p)
 
+def c_v(STR):
+	#easy wrapper to check values of a dict to see if we can use it
+	t = control_dict.get(STR,False)
+	return(t)
+
 def get_wage_posted(div_v, default = None):
 	# get the wage of the job
 	try:
@@ -139,8 +149,12 @@ def get_wage_posted(div_v, default = None):
 			else:
 				out_temp = div_v.find_all(["div","span"])
 				for temp in out_temp:
-					if ("$" in cln_txt(temp) and len(str(temp))<90 and 'http' not in cln_txt(temp)):
-						out_p = temp
+					if ("$" in cln_txt(temp) and len(str(temp)) < 90):
+						if(c_v('EXCLUDE_HTTP_FROM_WAGES_SEARCH')):
+							if ('http' not in cln_txt(temp)):
+								out_p = cln_txt(temp)
+						else:
+							out_p = cln_txt(temp)
 				if(out_p == None):
 					#I'm going to scan through ALL the text looking for a wage rate!
 					out_p = clean_for_wages(cln_txt(div_v))
@@ -148,6 +162,7 @@ def get_wage_posted(div_v, default = None):
 						out_p = default
 
 		else:
+			print('Get Wages Failed')
 			out_p = out_p.text
 	except:
 		out_p = default
@@ -279,6 +294,10 @@ def extract_jobposting_from_soup(div_v, default = 'N/A', search_for_wages = Fals
 	get_companyurl_posted(div_v)]				#CompanyURL
 	if(search_for_wages):
 		job = check_for_wages(job)
+
+	if(c_v('HOT ENCODE')):
+		#if we want to check for a hot encode
+		job = [j.encode(control_dict['HOT ENCODE']) if type(j) is unicode and j!= None else j for j in job]
 	return(job)
 
 def extract_similar_jobs(soup):
@@ -425,7 +444,7 @@ def check_for_wages(in_list, wage_index = 3):
 
 	return(in_list)
 
-def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, method = 'first', exclude_http = True):
+def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, method = 'first'):
 	#cleans a string and only pulls out hte wage amount
 	#wage_Type = 'H' is hourly wages, 'S" is salaried wages
 	#method = first pulls the first occurence of wage, or method - average averages all occurens together
@@ -438,7 +457,7 @@ def clean_for_wages(in_s, auto_clean = True, upper_limit = 90, lower_limit = 8, 
 		return(0)
 	if('$' not in in_s):
 		return(0)
-	if(exclude_http):
+	if(c_v('EXCLUDE_HTTP_FROM_WAGES_SEARCH')):
 		if('HTTP' in in_s):
 			return(0)
 	#print(in_s)
@@ -540,10 +559,12 @@ def link_to_linkid(URL):
 		index = order_dict.get(u_split[0],99)
 		if(index < len(order_dict)):
 			URL_split[index] = u_split[1]
+		if('company%3A' in u_split[1] and URL_split[4] == ''): #special case where
+			URL_split[4] = u_split[1][10:len(u_split[1])]
 
 	#Now  pulling out salary from Job Code (if it exists)
 	if(URL_split[0] != ''):
-		wage = clean_for_wages(URL_split[0], exclude_http=False)
+		wage = clean_for_wages(URL_split[0])
 		if(wage!=''):
 			URL_split[1] = str(int(wage))
 			jobsplit = URL_split[0].split('$')
@@ -551,6 +572,9 @@ def link_to_linkid(URL):
 				URL_split[0] = ''
 			else:
 				URL_split[0] = ' '.join(jobsplit[:(len(jobsplit)-1)]).strip()
+	#doing a special search if we are straight up looking for a company:
+
+
 	return('|'.join(URL_split))
 
 def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None ):
@@ -610,7 +634,6 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 		URL_list = walk_url_trees(URL)
 	else:
 		URL_list = URL
-	print(URL_list)
 	for url in URL_list:
 		URL_ID = link_to_linkid(url)
 		Page_Count = 0
@@ -636,7 +659,7 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, Page
 			# breaking down soup to div
 			soup_div = soup_obj.find_all('div', attrs={'class': ['row', 'request']})
 			for div in soup_div:
-				data.append([URL_ID, extract_jobposting_from_soup(div)])
+				data.append([URL_ID] + extract_jobposting_from_soup(div))
 			# getting next round of URL's to use
 			if(Next):
 				next_URL = extract_next_links(soup_obj, NEXT=True)
@@ -709,7 +732,7 @@ if __name__ == "__notmain__":
 				#breaking down soup to div
 				soup_div = soup_obj.find_all('div', attrs = {'class':['row','request']})
 				for div in soup_div:
-					return_data.append([URL_ID,extract_jobposting_from_soup(div)])
+					return_data.append([URL_ID + extract_jobposting_from_soup(div)])
 			#getting next round of URL's to use
 			URL = extract_next_links(soup_obj, NEXT = True)
 			current_page = current_page + 1
@@ -723,7 +746,7 @@ if __name__ == "__notmain__":
 			writer.writerows(basic_stats)
 
 if __name__ == "__main__":
-	save_loc = '/home/asmodi/' # 'c:/scripts/'  # '/home/asmodi/'
+	save_loc =  'c:/scripts/'  # '/home/asmodi/'
 
 	write_path = save_loc + 'output.txt'
 	write_stats = save_loc + 'stats.txt'
@@ -737,12 +760,15 @@ if __name__ == "__main__":
 			   'company%3A"McDonald%27s"']
 				#the %27 is for the appostrofy (like in Lowe's)
 				#the %3A is a colon
-
+	State = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID',
+'IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE',
+'NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN',
+'TX','UT','VT','VA','WA','WV','WI','WY']
 	print "Starting ...\n"
 	print "Starting data scraping ..."
 	myLoopZipCounter = 0
 	myPrintCounter = 0
-	page_limit = 100
+	page_limit = 500
 
 	job_cursor, job_conn = db.connect_to_storage_db(db_loc)
 
@@ -752,16 +778,20 @@ if __name__ == "__main__":
 		os.remove(write_stats)
 	except:
 		print('couldnt deleter the file, oh well')
+	for s in State:
+		for job in job_url:
+			print("working on %r in %r" %(job,s))
+			URL = create_url(job=job, location=s, limit = None)
+			scrape_indeed(URL, save_loc=save_loc)
 
-	for job in job_url:
-		print("working on %r" %job)
-		URL = create_url(job=job, location='', limit = None)
-		scrape_indeed(URL, save_loc=save_loc)
-	for job in job_url: #yes, I'm doing this twice, once wehre I walk the tree, the second time where I just hit every job posting
-		print("working on %r" % job)
-		URL = create_url(job=job, location='', limit=None)
-		scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
-		scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
+		control_dict['EXCLUDE_HTTP_FROM_WAGES_SEARCH']  =False
+
+
+		for job in job_url: #yes, I'm doing this twice, once wehre I walk the tree, the second time where I just hit every job posting
+			print("working on %r in %r" % (job,s))
+			URL = create_url(job=job, location=s, limit=None)
+			scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
+
 
 else:
 	print("well.....poop")

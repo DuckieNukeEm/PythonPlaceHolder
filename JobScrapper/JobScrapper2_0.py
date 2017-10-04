@@ -649,7 +649,7 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, curs
 		while(Page_limit > Page_Count):
 			sleep(1)
 			if(verbos):
-				print('working on %r of %r, with URl %r' % (Page_Count, page_limit, cur_url))
+				print('working on %r of %r, with URl %r' % (Page_Count, Page_limit, URL_ID))
 			soup_obj = call_website(cur_url)
 
 			if (soup_obj == False or soup_obj.find_all("div", {"class": "bad_query"})):

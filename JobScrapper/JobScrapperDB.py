@@ -50,7 +50,6 @@ def commit(cursor = None):
 def create_job_posting_table(cursor):
     cursor.execute('''create table job_posting(
 					SearchKey Text,
-					SearchDate Date,
 					JobID  Text,
 	 				PostedDate Date,
 					JobRole Text,
@@ -62,12 +61,12 @@ def create_job_posting_table(cursor):
 					Sponsored_Ad Text,
 					OnSite Text,
 					CompanyURL Text,
-					PRIMARY KEY (JobID, SearchKey)
+					SearchDate Date
 					)'''
                    )
     commmit(cursor)
 
-def lisf_of_list(in_l):
+def list_of_list(in_l):
     #Checks if a list is a list of list or just a list
     if any(isinstance(s, list) for s in in_l):
         return(True)
@@ -78,11 +77,11 @@ def insert_into_job_posting(data, cursor):
     #a function that will drop the data into
     if(list_of_list(data)):
         for l in data:
-            input_data = l[0] + [now()] + l[:len(l)] #inserting current date
-            cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+            l.append(now()) #inserting current date
+            cursor.execute('insert into job_posting VALUES  (?,?,?,?,?,?,?,?,?,?,?,?,?)', l)
     else:
-        input_data = data[0] + [now()] + data[:len(data)]
-        cursor.execute('insert into job_posting (?,?,?,?,?,?,?,?,?,?,?,?,?', input_data)
+        data.append(now())
+        cursor.execute('insert into job_posting VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',_data)
         
     commit(cursor)
 

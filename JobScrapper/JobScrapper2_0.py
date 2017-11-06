@@ -788,7 +788,7 @@ if __name__ == "__main__":
 
 
 	for s in State:
-
+		control_dict['EXCLUDE_HTTP_FROM_WAGES_SEARCH']  = True
 		for job in job_url:
 			print("working on %r in %r" %(job,s))
 			URL = create_url(job=job, location=s,  limit = None )

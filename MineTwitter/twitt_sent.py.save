@@ -1,0 +1,13 @@
+
+import os
+import sys
+import json
+
+
+
+def  ASCII(str):
+	str = unicode(str, errors = 'ignore')
+	return str
+
+def tokenize(str):
+	

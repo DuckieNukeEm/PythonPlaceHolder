@@ -150,12 +150,13 @@ def get_wage_posted(div_v, default = None):
 			else:
 				out_temp = div_v.find_all(["div","span"])
 				for temp in out_temp:
-					if ("$" in cln_txt(temp) and len(str(temp)) < 90):
+					temp = cln_txt(temp)
+					if ("$" in temp and len(temp) < 90):
 						if(c_v('EXCLUDE_HTTP_FROM_WAGES_SEARCH')):
-							if ('http' not in cln_txt(temp)):
-								out_p = cln_txt(temp)
+							if ('HTTP' not in temp.upper()):
+								out_p = temp
 						else:
-							out_p = cln_txt(temp)
+							out_p = temp
 				if(out_p == None):
 					#I'm going to scan through ALL the text looking for a wage rate!
 					out_p = clean_for_wages(cln_txt(div_v))
@@ -542,7 +543,7 @@ def link_to_linkid(URL):
 				  'radius':6
 				  }
 
-	if(type(URL)!=str):
+	if(type(URL) not in [str,unicode]):
 		return(str(URL))
 
 	URL_split = ['','','','','','','']
@@ -564,9 +565,9 @@ def link_to_linkid(URL):
 			URL_split[4] = u_split[1][10:len(u_split[1])]
 
 	#Now  pulling out salary from Job Code (if it exists)
-	if(URL_split[0] != ''):
+	if(URL_split[0] != 0):
 		wage = clean_for_wages(URL_split[0])
-		if(wage!=''):
+		if(wage!=0):
 			URL_split[1] = str(int(wage))
 			jobsplit = URL_split[0].split('$')
 			if(len(jobsplit) == 1):  #there's no job, it's just a salary search
@@ -578,15 +579,15 @@ def link_to_linkid(URL):
 		# if we want to check for a hot encode
 		URL_split = [j.encode(control_dict['HOT ENCODE']) if type(j) in (unicode,str) and j != None else j for j in URL_split]
 
-	return('|'.join(URL_split))
+	return('-'.join(URL_split))
 
 
 def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None ):
 	#this function will take the start URL, and then will cut the data by every option to get the deepest refinment of the data
 	#it will be this we walk down the file
 	#we will first walk it by Company, then by Job, then by Salary Group, then by experience
-	sleep(1)
-	print(START_URL)
+	sleep(0.1)
+	#print(START_URL)
 
 	#if a list was passed, I just want to ttake the first element of the list
 	if (isinstance(START_URL, list)):
@@ -620,6 +621,7 @@ def walk_url_trees(START_URL, PREPEND_URL = 'http://indeed.com', cursor = None )
 		for l in XP_URL_LIST:
 			return_list = return_list + walk_url_trees(l, PREPEND_URL, cursor)
 	else:
+		print('hit end tree of %r' %(START_URL))
 		return([PREPEND_URL + START_URL])
 
 	return(return_list)
@@ -665,7 +667,7 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, curs
 			# breaking down soup to div
 			soup_div = soup_obj.find_all('div', attrs={'class': ['row', 'request']})
 			for div in soup_div:
-				data.append([URL_ID] + extract_jobposting_from_soup(div))
+				data.append([URL_ID] + extract_jobposting_from_soup(div)+[ url])
 			# getting next round of URL's to use
 			if(Next):
 				next_URL = extract_next_links(soup_obj, NEXT=True)
@@ -687,7 +689,8 @@ def scrape_indeed(URL, Get_Stats = True, Output_to_db = False, Next = True, curs
 				writer = csv.writer(c, lineterminator='\n', delimiter='|')
 				writer.writerows(basic_stats)
 		if(cursor != None):
-			db.insert_into_job_posting(data,cursor)
+			#db.insert_into_job_posting(data,cursor)
+			1==1
 
 
 
@@ -794,13 +797,13 @@ if __name__ == "__main__":
 			URL = create_url(job=job, location=s,  limit = None )
 			scrape_indeed(URL, save_loc=save_loc,Output_to_db = True,cursor = job_cursor)
 
-		control_dict['EXCLUDE_HTTP_FROM_WAGES_SEARCH']  =False
+	#	control_dict['EXCLUDE_HTTP_FROM_WAGES_SEARCH']  =False
 
 
 		for job in job_url: #yes, I'm doing this twice, once wehre I walk the tree, the second time where I just hit every job posting
 			print("working on %r in %r" % (job,s))
-			URL = create_url(job=job, location=s, limit=None)
-			scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
+	#		URL = create_url(job=job, location=s, limit=None)
+	#		scrape_indeed(URL, save_loc=save_loc, walk_tree=False)
 
 
 

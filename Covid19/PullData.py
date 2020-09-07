@@ -2,10 +2,14 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, date
 
+MAIN_DATA = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/"
+US_DATA = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports_us/"
 
-def pull_daily_data(URL: str = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports/",
+
+def pull_daily_data(URL: str = MAIN_DATA,
                     start_dt: str = '01-22-2020',
-                    end_dt: str = None):
+                    end_dt: str = None,
+                    verbose: bool = False) -> pd.DataFrame:
     start_date = datetime.strptime(start_dt, '%m-%d-%Y').date()
     Cur_date = start_date
     if end_dt is None:
@@ -15,19 +19,19 @@ def pull_daily_data(URL: str = "https://raw.githubusercontent.com/CSSEGISandData
 
     data_dict = dict()
     while Cur_date <= end_dt:
-        if False:
+        if verbose:
             print('Working on date: {}'.format(Cur_date.strftime("%Y-%m-%d")))
         try:
             df_temp = pd.read_csv(URL + Cur_date.strftime("%m-%d-%Y") + '.csv')
             df_temp['date'] = Cur_date.strftime("%Y-%m-%d")
             df_temp = df_temp.rename(columns={"Province/State": "State",
-                                              "Country/Region": "Country",
-                                              'Province_State': 'State',
-                                              'Country_Region': "Country",
-                                              'Latitude': 'Lat',
-                                              'Longitude': "Long",
-                                              'Long_': 'Long',
-                                              'Last Update': 'Last_Update'})
+                                            "Country/Region": "Country",
+                                            'Province_State': 'State',
+                                            'Country_Region': "Country",
+                                            'Latitude': 'Lat',
+                                            'Longitude': "Long",
+                                            'Long_': 'Long',
+                                            'Last Update': 'Last_Update'})
             data_dict[Cur_date.strftime("%Y-%m-%d")] = df_temp
         except Exception:
             print('skiping')
@@ -38,39 +42,37 @@ def pull_daily_data(URL: str = "https://raw.githubusercontent.com/CSSEGISandData
     return(df)
 
 
-def pull_us_daily_data(URL: str = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_daily_reports_us/",
-                       start_dt: str = '04-12-2020',
-                       end_dt: str = None,
-                       fix_headers: bool = True) -> pd.DataFrame:
-    df = pull_daily_data(URL=URL, start_dt=start_dt, end_dt=end_dt)
-
-    if fix_headers is False:
-        return(df)
-    df = df \
-        .assign(Combined_Key=lambda x: x.State + ', US')
-    return(df)
-
-
 def pull_data(start_dt: str = '01-22-2020',
-              end_dt: str = None,
-              switch_USA: bool = False) -> pd.DataFrame:
+            end_dt: str = None,
+            URL: str = MAIN_DATA,
+            US_URL: str = US_DATA,
+            switch_USA: bool = False) -> pd.DataFrame:
     print("Pulling all data")
-    df = pull_daily_data(start_dt=start_dt, end_dt=end_dt)
+    df = pull_daily_data(URL=URL,
+                        start_dt=start_dt,
+                        end_dt=end_dt)
 
     if switch_USA is False:
+        print("Returning Data")
         return(df)
 
     if datetime.strptime(start_dt, '%m-%d-%Y').date() < date(2020, 4, 12):
         start_dt = '04-12-2020'
+
     print("Pulling US Data")
-    df_us = pull_us_daily_data(start_dt=start_dt, end_dt=end_dt)
+    df_us = pull_daily_data(URL=US_URL,
+                            start_dt=start_dt, 
+                            end_dt=end_dt)
+    df_us = df_us \
+                .assign(Combined_Key=lambda x: x.State + ', US')
     US_Cols_to_keep = [x for x in df_us.columns if x in df.columns]
 
+    print("merging Data")
     df_us = df_us[US_Cols_to_keep]
     df_us = df_us[df_us.State != 'Recovered']
-
+    
     df = df[~((df.Country == 'US') &
-              (pd.to_datetime(df.date) > datetime(2020, 4, 11)))]
+            (pd.to_datetime(df.date) > datetime(2020, 4, 11)))]
     df = pd.concat([df, df_us])
 
     df.reset_index()
@@ -144,17 +146,17 @@ def fix_locals(df: pd.DataFrame) -> pd.DataFrame:
             'Chicago': 'Illinois'}
     df = df \
         .assign(State_Fix_1=lambda x: x.State
-                                       .str
-                                       .split(', ')
-                                       .str[-1]
-                                       .str
-                                       .strip()
-                                       .map(Ind_2_State, 'ignore'),
+                                    .str
+                                    .split(', ')
+                                    .str[-1]
+                                    .str
+                                    .strip()
+                                    .map(Ind_2_State, 'ignore'),
                 State=lambda x: np.where((x.Country == 'US'),
-                                         np.where(x.State_Fix_1.isna(),
-                                                  x.State,
-                                                  x.State_Fix_1),
-                                         x.State)) \
+                                        np.where(x.State_Fix_1.isna(),
+                                                x.State,
+                                                x.State_Fix_1),
+                                        x.State)) \
         .drop(columns=['State_Fix_1'])
 
     country_dict = {'Diamond Princess': 'Boats',
@@ -172,15 +174,15 @@ def fix_locals(df: pd.DataFrame) -> pd.DataFrame:
                 State=lambda x: np.where(x.State.isna(), '-', x.State)) \
         .drop(columns={'C1'}) \
         .assign(Country=lambda x: np.where(x.Combined_Key == 'Recovered, Canada',
-                                           'Canada',
-                                           x.Country))
+                                        'Canada',
+                                        x.Country))
 
     return(df)
 
 
 def calc_daily(df: pd.DataFrame, Level: list) -> pd.DataFrame:
     """calculates the current active via the following formula
-    DailyRecovered = REcovered - Recovered[-1],
+    DailyRecovered = Recovered - Recovered[-1],
     DailyDeaths = Deaths - Deaths[-1]
     DailyActive = Confirmed - Active - Deaths
     NetChange = Active - Active[1]
@@ -193,39 +195,42 @@ def calc_daily(df: pd.DataFrame, Level: list) -> pd.DataFrame:
         Level = [x for x in Level if x != 'date']
 
     df_group = df.fillna(0) \
-                 .assign(Active=lambda x: np.where((x.Active == 0) |
-                                                  (x.Active == (x.Confirmed - x.Deaths)),
-                                                   x.Confirmed -
-                                                   x.Deaths -
-                                                   x.Recovered,
-                                                   np.where((x.State == 'Recovered') &
+                .assign(Active=lambda x: np.where((x.Active == 0) |
+                                                (x.Active == (x.Confirmed -
+                                                                x.Deaths)),
+                                                x.Confirmed -
+                                                x.Deaths -
+                                                x.Recovered,
+                                                np.where((x.State == 'Recovered') &
                                                             (x.Active != x.Recovered*-1),
                                                             x.Recovered * -1,
                                                             x.Active)),
-                         )\
-                 .groupby(Level_with_Date)
-                 [['Active', 'Confirmed', 'Deaths', 'Recovered']] \
-                 .sum() \
-                 .reset_index() 
+                        )\
+                .groupby(Level_with_Date)\
+                [['Active', 'Confirmed', 'Deaths', 'Recovered']] \
+                .sum() \
+                .reset_index()
 
     df_group = pd.concat([df_group,
-                          df_group \
-                              .groupby(Level) \
-                              [['Active', 'Confirmed', 'Deaths', 'Recovered']] \
-                              .shift() \
-                              .rename(columns={'Active': 'Active_L1', 
-                                               'Confirmed': 'Confirmed_L1',
-                                               'Deaths': 'Deaths_L1',
-                                               'Recovered': 'Recovered_L1'}) \
-                              .fillna(0)
-                          ],
-                         axis=1)
+                        df_group \
+                            .groupby(Level)
+                            [['Active', 'Confirmed', 'Deaths', 'Recovered']] \
+                            .shift() \
+                            .rename(columns={'Active': 'Active_L1', 
+                                            'Confirmed': 'Confirmed_L1',
+                                            'Deaths': 'Deaths_L1',
+                                            'Recovered': 'Recovered_L1'}) \
+                            .fillna(0)
+                        ],
+                        axis=1)
     df_group = df_group \
                 .assign(Recovered_Daily=lambda x: x.Recovered - x.Recovered_L1,
                         Deaths_Daily=lambda x: x.Deaths - x.Deaths_L1,
                         NewCases_Daily=lambda x: x.Confirmed - x.Confirmed_L1,
                         Active_Daily=lambda x: x.Confirmed - x.Deaths - x.Recovered,
-                        NetChange=lambda x: x.NewCases_Daily - x.Recovered_Daily - x.Deaths_Daily,
+                        NetChange=lambda x: x.NewCases_Daily -
+                                            x.Recovered_Daily -
+                                            x.Deaths_Daily,
                         Error=lambda x: x.Active_L1 - x.Active + x.NetChange
                         ) \
                 .drop(columns=['Active_L1', 'Confirmed_L1', 'Deaths_L1', 'Recovered_L1']) 
@@ -233,16 +238,41 @@ def calc_daily(df: pd.DataFrame, Level: list) -> pd.DataFrame:
     return(df_group)
 
 
-df = pull_data(switch_USA=True)
-df_fix = fix_locals(df)
-df_day = calc_daily(df_fix, ['Country'])
+def get_data(URL: str = MAIN_DATA,
+            US_URL: str = US_DATA,
+            Level: list = ['Country'],
+            switch_USA: bool = False,
+            start_dt: str = '01-22-2020',
+            end_dt: str = None) -> pd.DataFrame:
+    """Pulls data and cleans it for you too
+    """
+    df = pull_data(start_dt=start_dt,
+                end_dt=end_dt,
+                URL=URL,
+                US_URL=US_URL,
+                switch_USA=switch_USA)
+    df = fix_locals(df)
+    df = calc_daily(df, Level=Level)
 
-DATE = datetime.today() + timedelta(days=-10)
+    return(df)
+
+if False:  
+    df = pull_data(switch_USA=True)
+    df_fix = fix_locals(df)
+    df_day = calc_daily(df_fix, ['Country'])
+
+    DATE = datetime.today() + timedelta(days=-4)
+    DATE = DATE.strftime('%Y-%m-%d')
+    df_day.query('Country in ["US","Italy"] and date >= @DATE')
+
+
+    df_day.query('Country == "US"').to_csv('/home/asmodi/Downloads/USA_Covid.csv', index=False)
+
+    df_day.query('Country == "Italy"').to_csv('/home/asmodi/Downloads/Italy_Covid.csv', index=False)
+    df_day.query('Country == "Italy" and date >= @DATE')
+
+df_day = get_data(Levels = ['Country'], switch_USA = True)
+
+DATE = datetime.today() + timedelta(days=-4)
 DATE = DATE.strftime('%Y-%m-%d')
 df_day.query('Country in ["US","Italy"] and date >= @DATE')
-
-
-df_day.query('Country == "US"').to_csv('/home/asmodi/Downloads/USA_Covid.csv', index=False)
-
-df_day.query('Country == "Italy"').to_csv('/home/asmodi/Downloads/Italy_Covid.csv', index=False)
-df_day.query('Country == "Italy" and date >= @DATE')

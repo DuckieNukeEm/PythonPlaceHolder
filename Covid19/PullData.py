@@ -256,6 +256,44 @@ def get_data(URL: str = MAIN_DATA,
 
     return(df)
 
+def get_pop(fips_loc: str = "./Data/fips_to_county.csv",
+            county_pop:str = './Data/co-est2019-alldata.csv',
+            country_pop= ''):
+    # merging fips with county populations
+    Df_fips = pd.read_csv(fips_loc)
+    Df_fips['fipscounty'] = Df_fips.fipscounty.apply(lambda x: 44990 if x == 44999 else x)
+    Df_fips['fipscounty'] = Df_fips.fipscounty.apply(lambda x: x if x != 46113 else 46102)
+    Df_fips['fipscounty'] = Df_fips.fipscounty.apply(lambda x: x if x !=  2270 else  2158)
+    # Loading County/State level  population information
+    Df_state = pd.read_csv(county_pop, encoding = 'latin-1')\
+                        .rename(columns = {'POPESTIMATE2010':'pop',
+                                           'STATE':'state',
+                                            'COUNTY':'county'})
+    Df_state['county'] = Df_state.county.apply(lambda x: x if x > 0 else 990)
+
+    Df_state = Df_state.assign(fipscounty = lambda x: x.state * 1000 + x.county)
+        
+    #Df_state = Df_state[['fipscounty','pop','state','county']]
+    Fips_pop = ppd.merge(
+                              Df_fips,
+                              Df_state[['fipscounty','pop']],
+                              how = 'inner',
+                              on = ['fipscounty'])\
+                    .assign(pop_100k = lambda x: round(x['pop']/100000,2))\
+                    .rename(columns = {'fipsstate':'state_cd',
+                                       'fipscounty':'FIPS'}) \
+                    .drop(columns = ['ssastate','ssacounty'])
+
+
+    #Loading world level infom
+    Df_wrld = pd.read_csv('./Data/WorldPopulation.csv') \
+                .query("Type == 'Country/Area'")\
+                .rename(columns = {'2020':'pop'})\
+                [['Country','Country code','pop']]\
+                .assign(pop_100k = lambda x: round(x['pop']/100000,2))
+    
+    return(Fips_pop, Df_wrld)
+
 if False:  
     df = pull_data(switch_USA=True)
     df_fix = fix_locals(df)
@@ -271,8 +309,9 @@ if False:
     df_day.query('Country == "Italy"').to_csv('/home/asmodi/Downloads/Italy_Covid.csv', index=False)
     df_day.query('Country == "Italy" and date >= @DATE')
 
-df_day = get_data(Levels = ['Country'], switch_USA = True)
+if False:
+    df_day = get_data(Level = ['Country'], switch_USA = True)
 
-DATE = datetime.today() + timedelta(days=-4)
-DATE = DATE.strftime('%Y-%m-%d')
-df_day.query('Country in ["US","Italy"] and date >= @DATE')
+    DATE = datetime.today() + timedelta(days=-4)
+    DATE = DATE.strftime('%Y-%m-%d')
+    df_day.query('Country in ["US","Italy"] and date >= @DATE')

@@ -256,6 +256,16 @@ def get_data(URL: str = MAIN_DATA,
 
     return(df)
 
+def pretty_print(Df: pd.DataFrame, Days_back: int = 4, delim = '\t'):
+	""" Pretty prints the fiel for a given number of days"""
+	DATE = datetime.today() + timedelta(days=-Days_back)
+	DATE = DATE.strftime('%Y-%m-%d')
+	DF_print = Df.query('date >= @DATE')	
+	print(delim.join(DF_print.columns))
+	for indx, row in DF_print.iterrows():
+		print(delim.join([str(x) for x in row]))
+		
+
 def get_pop(fips_loc: str = "./Data/fips_to_county.csv",
             county_pop:str = './Data/co-est2019-alldata.csv',
             country_pop= ''):
@@ -311,7 +321,4 @@ if False:
 
 if False:
     df_day = get_data(Level = ['Country'], switch_USA = True)
-
-    DATE = datetime.today() + timedelta(days=-4)
-    DATE = DATE.strftime('%Y-%m-%d')
-    df_day.query('Country in ["US","Italy"] and date >= @DATE')
+    pretty_print(df_day.query("Country in ['US','Italy']"), 10)
